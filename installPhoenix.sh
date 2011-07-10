@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # $id: installPhoenix.sh 2011-07-09 22:37:01Z mabuse $
 #
 # installPhoenix.sh - install TYPO3 Phoenix to the current working directory
@@ -9,13 +9,15 @@
 ##
 # Set the defaults
 
-DBHOST=127.0.0.1
-DBNAME=phoenix
-
+dbhost=127.0.0.1
+dbname=phoenix
+package=TYPO3v5
 ##
 # Set the configuration for this script
 
-MANDATORY_FIELDS=( DBUSER DBPASS GITUSER SOURCE )
+MANDATORY="dbuser,dbpass,gituser,destination"
+OIFS=$IFS
+IFS=,
 ##
 # Print usage information
 
@@ -24,13 +26,13 @@ usage () {
 	cat <<EOF
 
 Usage: $0 [OPTIONS]
-	--dbhost=127.0.0.1		Provide IP-address of the database
-	--dbname=phoenix		Provide name of the database
-	--dbuser			Provide name of the database user with write access to dbname
-	--dbpass			Provide password of the database user
-	--gituser			Provide username with access to https://review.typo3.org
-	--source			Provide a path that acts as the source for the Phoenix installation
-
+	--package=TYPO3v5	Provide the name of the package you like to install
+	--dbhost=127.0.0.1	Provide IP-address of the database
+	--dbname=phoenix	Provide name of the database
+	--dbuser		Provide name of the database user with write access to dbname
+	--dbpass		Provide password of the database user
+	--gituser		Provide username with access to https://review.typo3.org
+	--destination		Provide a path that acts as the destination for Phoenix
 EOF
 		exit 1
 }
@@ -54,12 +56,15 @@ parse_arguments() {
 	for arg do
 		val=`echo "$arg" | sed -e "s;--[^=]*=;;"`
 		case "$arg" in
-			--dbhost=*) DBHOST="$val" ;;
-			--dbname=*) DBNAME="$val" ;;
-			--dbuser=*) DBUSER="$val" ;;
-			--dbpass=*) DBPASS="$val" ;;
-			--gituser=*) GITUSER="$val" ;;
-			--source=*) SOURCE="$val" ;;
+			--package=*) package="$val" ;;
+			--dbhost=*) dbhost="$val" ;;
+			--dbname=*) dbname="$val" ;;
+			--dbuser=*) dbuser="$val" ;;
+			--dbpass=*) dbpass="$val" ;;
+			--gituser=*) gituser="$val" ;;
+			--destination=*) destination="$val" ;;
+
+			--guided) guidedInstallation ;;
 
 			--help) usage ;;
 
@@ -75,16 +80,43 @@ parse_arguments() {
 ##
 # check the mandatory arguments, the basedir, the working SQL connection
 # Mandatory arguments are:
-#	DBUSER
-#	DBPASS
-#	GITUSER
-#	SOURCE
+#	dbuser
+#	dbpass
+#	gituser
+#	destination
 
 check_requirements () {
-	if [ "$DBPASS" == '' ] || [ "$DBUSER" == ''] || [ "$GITUSER" == '' ] || [ "$SOURCE" == '' ]; then
-		returnMissingArgumentError
-		exit 1
+	
+	# Check mandatories
+	for i in $MANDATORY 
+	do
+		if [ -n "${!i}" ] 
+		then
+			#do some stupid stuff because bash wouldn't like an empty then-statement
+			foo="bar"
+		else
+			errors=$i" $errors"
+		fi
+	done
+	echo $errors
+	if [ "$errors" != '' ]; then
+		returnMissingArgumentError $errors
 	fi
+	
+	#check path
+	
+	#check SQL Connection
+}
+
+returnMissingArgumentError() {
+	IFS=" "
+	echo "Some mandatory arguments were not set. Please correct this and start this script again"
+	echo 
+	for singleError in $errors
+	do
+		echo "Missing: --$singleError "
+	done
+	exit 1
 }
 
 ##
@@ -95,18 +127,13 @@ shell_quote_string() {
 	echo "$1" | sed -e 's,\([^a-zA-Z0-9/_.=-]\),\\\1,g'
 }
 
-
-returnMissingArgumentError() {
-	echo "Some mandatory arguments were not set. Please correct this and start this script again"
-	echo
-	usage 
-	exit 1
-}
+##
+# Process git clone and register the neccessary submodule
 
 function getPhoenix(){
-	git clone --recursive git://git.typo3.org/TYPO3v5/Distributions/Base.git TYPO3v5
+	git clone --recursive git://git.typo3.org/TYPO3v5/Distributions/Base.git $destination 
 
-	cd TYPO3v5/
+	cd $destination
 
 	scp -p -P 29418 $GITUSER@review.typo3.org:hooks/commit-msg .git/hooks/
 
@@ -115,10 +142,17 @@ function getPhoenix(){
 	git submodule foreach 'git checkout master; git pull'
 }
 
+function getFLOW3() {
+	echo "Soon!"
+	exit 0
+}
+
+##
 # Create file Configuration/Settings.yaml
+
 function createSettings(){
-pwd
-exit
+
+cd $destination
 SETTINGS=$( cat <<.
 TYPO3: 
 FLOW3: 
@@ -162,11 +196,23 @@ function returnSuccessMessage(){
 }
 
 
+function guidedInstallation(){
+	# Guided goes here
+	echo "Soon"
+	exit 0
+	
+}
+
+
+function doInstall() {
+	getPhoenix
+	createSettings
+	initializeFLOW3
+	returnSuccessMessage
+}
+
+
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
 check_requirements
-exit
-getPhoenix
-createSettings
-initializeFLOW3
-returnSuccessMessage
+doInstall
 exit 0
