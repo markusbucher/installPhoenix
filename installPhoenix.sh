@@ -18,11 +18,12 @@ dbhost=127.0.0.1
 dbname=phoenix
 package=TYPO3v5
 subfolder=TYPO3v5
+installtype=demo
 
 ##
 # Set the configuration for this script
 
-MANDATORY="dbuser,dbpass,gituser"
+MANDATORY="dbuser,dbpass"
 OIFS=$IFS
 IFS=,
 
@@ -50,6 +51,7 @@ usage () {
 
 Usage: $0 [OPTIONS]
 	--package=TYPO3v5	Provide the name of the package you like to install
+	--nodemo		If set FLOW3 will be installed without PhoenixDemoTypo3Org site
 	--dbhost=127.0.0.1	Provide IP-address of the database
 	--dbname=phoenix	Provide name of the database
 	--dbuser		Provide name of the database user with write access to dbname
@@ -85,6 +87,7 @@ parse_arguments() {
 		val=`echo "$arg" | sed -e "s;--[^=]*=;;"`
 		case "$arg" in
 			--package=*) package="$val" ;;
+			--nodemo=) nodemo=1 ;;
 			--dbhost=*) dbhost="$val" ;;
 			--dbname=*) dbname="$val" ;;
 			--dbuser=*) dbuser="$val" ;;
@@ -92,7 +95,7 @@ parse_arguments() {
 			--gituser=*) gituser="$val" ;;
 			--subfolder=*) subfolder="$val"; 
 				if [ $subfolder=="" ]; then
-					returnError 6 "--subfolder must not be empty or contain a slash when given"
+					returnError 99 "--subfolder must not be empty or contain a slash when given"
 				fi
 				echo $mywd
 				#unset phoenixpath; 
@@ -136,9 +139,29 @@ check_requirements () {
 		returnError 1 $errors
 	fi
 	
-	#check path
+	#check if path is writable and not empty
+	if [ -d "$phoenixpath" ] && [ ! -w "$phoenixpath" ] 
+	then
+		returnError 99 "You don't have write permissions in the specified folder."
+	fi
+	
+	if [ -d "$phoenixpath" ] && [ "$(ls -A $phoenixpath)" ] 
+	then
+		returnError 99 "The specified path is not empty."
+	fi
 	
 	#check SQL Connection
+	sqlcheck1=$( echo "SHOW DATABASES like '$dbname'" | mysql -u $dbuser -p$dbpass > /dev/null )
+	if [ $? -gt 0 ]; then
+		returnError 2
+		exit
+	fi
+	sqlcheck2=$( echo "select count(*) as '' from information_schema.tables where table_type = 'BASE TABLE' and table_schema = '$dbname'" | mysql -u $dbuser -p$dbpass  )
+	if [ ! "$sqlcheck2"=="0" ]; then
+		echo $sqlcheck2
+		returnError 99 "The specified database is not empty."
+		exit
+	fi
 }
 
 ##
@@ -150,7 +173,10 @@ check_requirements () {
 # 2 = Connection to MySQL not possible
 # 3 = subfolder not empty
 # 4 = Could not connect to git repo
-# 5 = Permission problem
+# 5 = Git access problem
+# 6 = Permission problem
+# 7 = flow3 script error
+# 99 = Use arg2 as error message
 
 returnError() {
 echo
@@ -181,15 +207,24 @@ case $1 in
 	exit 1
 	;;
 5)
-	echo "You don't have enough permissions to execute this file operation. Please try executing this script with 'sudo'"
+	echo "The git-repository could not be reached due to access problems. Do you have created an ssh key pair and published the public key in review.typo3.org?"
 	exit 1
 	;;
 6)
+	echo "You don't have enough permissions to execute this file operation. Please try executing this script with 'sudo'"
+	exit 1
+	;;
+7)
+	echo "An error occured when executing flow3 script. Please have a look at $errorlogfile."
+	exit 1
+	;;
+
+99)
 	echo $2
 	exit 1
 	;;
 *)
-	echo "An error occured, plase have a look at $errorlogfile."
+	echo "An error occured, please have a look at $errorlogfile."
 	exit 1
 	;;
 esac
@@ -210,25 +245,41 @@ function getPhoenix(){
 	git clone --recursive git://git.typo3.org/TYPO3v5/Distributions/Base.git $subfolder 1>>$logfile 2>$errorlogfile
 	if [ $? -gt 0 ]; then
 		returnError 4
+	else
+		echo "git clone processed without errors."
 	fi
+}
 
-	cd $subfolder
+##
+# Registers all the hooks to publish changes
+# inspires to share
+
+function addCommitHooks(){
+	cd $phoenixpath
 
 	scp -p -P 29418 $GITUSER@review.typo3.org:hooks/commit-msg .git/hooks/
 	if [ $? -gt 0 ]; then
-		returnError 4
+		returnError 5
+	else
+		echo "scp processed without errors."
 	fi
 	git submodule foreach 'scp -p -P 29418 $GITUSER@review.typo3.org:hooks/commit-msg .git/hooks/'
 	if [ $? -gt 0 ]; then
 		returnError 4
+	else
+		echo "submodule registered without errors."
 	fi
 	git submodule foreach 'git config remote.origin.push HEAD:refs/for/master'
 	if [ $? -gt 0 ]; then
 		returnError 4
+	else
+		echo "submodule registered without errors."
 	fi
 	git submodule foreach 'git checkout master; git pull'
 	if [ $? -gt 0 ]; then
 		returnError 4
+	else
+		echo "submodule registered without errors."
 	fi
 }
 
@@ -242,18 +293,18 @@ function getFLOW3() {
 
 function createSettings(){
 
-cd $subfolder
+cd $phoenixpath
 SETTINGS=$( cat <<.
 TYPO3: 
-FLOW3: 
+  FLOW3: 
     persistence: 
       backendOptions: 
         driver: 'pdo_mysql' 
-        dbname: '$DBNAME'   # adjust to your database name 
-        user: '$DBUSER'        # adjust to your database user 
-        password: '$DBPASS'        # adjust to your database password 
-        host: '$DBHOST'   # adjust to your database host 
-        path: '$DBHOST'   # adjust to your database host 
+        dbname: '$dbname'   # adjust to your database name 
+        user: '$dbuser'        # adjust to your database user 
+        password: '$dbpass'        # adjust to your database password 
+        host: '$dbhost'   # adjust to your database host 
+        path: '$dbhost'   # adjust to your database host 
         port: 3306 
 #      doctrine: 
          # If you have APC, you should consider using it for Production, 
@@ -268,17 +319,61 @@ echo "$SETTINGS" >> Configuration/Settings.yaml;
 }
 
 function initializeFLOW3(){
-	./flow3 flow3:cache:flush
-	./flow3 flow3:core:compile
-	./flow3 flow3:doctrine:migrate
-	./flow3 typo3:site:import < Packages/Sites/TYPO3/PhoenixDemoTypo3Org/Resources/Private/Content/Sites.xml
+cd $phoenixpath
+echo "Flushing..."
+	./flow3 flow3:cache:flush 1>>$logfile 2>$errorlogfile
+if [ $? -gt 0 ]; then
+	returnError 7
+else
+	echo "flow3 script processed without errors."
+fi
+echo "Compiling..."
+	./flow3 flow3:core:compile 1>>$logfile 2>$errorlogfile
+if [ $? -gt 0 ]; then
+	returnError 7
+else
+	echo "flow3 script processed without errors."
+fi
+echo "Migrating doctrine persistance..."
+	./flow3 flow3:doctrine:migrate 1>>$logfile 2>$errorlogfile
+if [ $? -gt 0 ]; then
+	returnError 7
+else
+	echo "flow3 script processed without errors."
+fi
+if [ ! -n "$nodemo" ]; then
+	echo "Importing PhoenixDemoTypo3Org..."
+	./flow3 typo3:site:import < Packages/Sites/TYPO3/PhoenixDemoTypo3Org/Resources/Private/Content/Sites.xml 1>>$logfile 2>$errorlogfile
+	if [ $? -gt 0 ]; then
+		returnError 7
+	else
+		echo "flow3 script processed without errors."
+	fi
+fi
 }
 
 function returnSuccessMessage(){
 	echo "Installation of TYPO3 phoenix finished. If you are using xdebug please make sure that
 	   xdebug.max_nesting_level is set to a value like 1000 inside php.ini"
 	echo
-	echo "Please have fun with your new system! Inspire people to share"
+	echo "You may want to set a vhost in your apache configuration:"
+	echo
+	
+vhost=$( cat <<. 
+<VirtualHost *:80>
+    ServerAdmin webmaster@yourwellchosendomain.com
+    DocumentRoot "$phoenixpath/Web"
+    ServerName phoenix.local
+    ServerAlias www.phoenix.local
+    ErrorLog "logs/phoenix.local-error_log"
+    CustomLog "logs/phoenix.local-access_log" common
+    <Directory "$phoenixpath/Web">
+      AllowOverride All
+    </Directory>
+</VirtualHost>	
+)
+	echo "vhost: $vhost"
+	echo "Please have fun with your new system! Inspire people to share."
 	echo
 	echo
 	echo
@@ -293,9 +388,15 @@ function guidedInstallation(){
 
 
 function doInstall() {
+echo "Starting installation."
+echo "Getting phoenix"
 	getPhoenix
+echo "Creating Settings"
 	createSettings
-	setPermissions
+#	setPermissions
+	if [ -n "$GITUSER" ]; then
+		addCommitHooks
+	fi
 	initializeFLOW3
 	returnSuccessMessage
 }
