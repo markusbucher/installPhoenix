@@ -2,7 +2,7 @@
 # $id: installPhoenix.sh 2011-07-09 22:37:01Z mabuse $
 #
 # installPhoenix.sh - install TYPO3 Phoenix to the current working directory
-# usage: installPhoenix.sh --ARGUMENT1 --ARGUMENT2 ... 
+# usage: installPhoenix.sh --ARGUMENT1 --ARGUMENT2 ...
 # Released under GNU GPL2 or later
 # Author: Markus Bucher, markusbucher@gmx.de
 # Author: Gordon Brueggemann, gb@gb-typo3.de
