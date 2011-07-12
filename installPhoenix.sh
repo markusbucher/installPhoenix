@@ -250,6 +250,7 @@ function getPhoenix(){
 	fi
 }
 
+
 ##
 # Registers all the hooks to publish changes
 # inspires to share
@@ -294,7 +295,8 @@ function getFLOW3() {
 function createSettings(){
 
 cd $phoenixpath
-SETTINGS=$( cat <<.
+
+SETTINGS="
 TYPO3: 
   FLOW3: 
     persistence: 
@@ -313,7 +315,7 @@ TYPO3:
          # when using MySQL and UTF-8, this should help with connection encoding issues 
 #        dbal: 
 #          sessionInitialization: 'SET NAMES utf8 COLLATE utf8_unicode_ci' 
-)
+"
 
 echo "$SETTINGS" >> Configuration/Settings.yaml;
 }
@@ -359,19 +361,21 @@ function returnSuccessMessage(){
 	echo "You may want to set a vhost in your apache configuration:"
 	echo
 	
-vhost=$( cat <<. 
+
+vhost=" 
 <VirtualHost *:80>
     ServerAdmin webmaster@yourwellchosendomain.com
-    DocumentRoot "$phoenixpath/Web"
+    DocumentRoot '$phoenixpath/Web'
     ServerName phoenix.local
     ServerAlias www.phoenix.local
-    ErrorLog "logs/phoenix.local-error_log"
-    CustomLog "logs/phoenix.local-access_log" common
-    <Directory "$phoenixpath/Web">
+    ErrorLog 'logs/phoenix.local-error_log'
+    CustomLog 'logs/phoenix.local-access_log' common
+    <Directory '$phoenixpath/Web'>
       AllowOverride All
     </Directory>
 </VirtualHost>	
-)
+"
+
 	echo "vhost: $vhost"
 	echo "Please have fun with your new system! Inspire people to share."
 	echo
