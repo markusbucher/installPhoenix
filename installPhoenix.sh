@@ -3,7 +3,9 @@
 #
 # installPhoenix.sh - install TYPO3 Phoenix to the current working directory
 # usage: installPhoenix.sh --ARGUMENT1 --ARGUMENT2 ... 
-#
+# Released under GNU GPL2 or later
+# Author: Markus Bucher, markusbucher@gmx.de
+# Author: Gordon Brueggemann, gb@gb-typo3.de
 
 COMMANDLINE_USER=$(whoami)
 if [ $COMMANDLINE_USER!="root" ]; then
@@ -50,14 +52,16 @@ usage () {
 	cat <<EOF
 
 Usage: $0 [OPTIONS]
-	--package=TYPO3v5	Provide the name of the package you like to install
-	--nodemo		If set FLOW3 will be installed without PhoenixDemoTypo3Org site
-	--dbhost=127.0.0.1	Provide IP-address of the database
+	--dbuser		Provide name of the database user with write access to dbname *
+	--dbpass		Provide password of the database user *
 	--dbname=phoenix	Provide name of the database
-	--dbuser		Provide name of the database user with write access to dbname
-	--dbpass		Provide password of the database user
-	--gituser		Provide username with access to https://review.typo3.org
-	--subfolder=TYPO3v5		Provide the name of the subfolder in which Phoenix will be installed
+	--dbhost=127.0.0.1	Provide IP-address of the database
+	
+	--subfolder=TYPO3v5	Provide the name of the subfolder in which Phoenix will be installed
+	
+	--nodemo		If set FLOW3 will be installed without PhoenixDemoTypo3Org site
+	--gituser		Provide username with access to https://review.typo3.org. This enables gitHooks
+	--package=TYPO3v5	Provide the name of the package you like to install
 	--debug			Print debug information and exit
 EOF
 		exit 1
@@ -76,6 +80,12 @@ append_arg_to_args () {
 # Process the given arguments, check for mandatory ones
 
 parse_arguments() {
+
+	if [ "$#" -eq 1 ]; then
+		usage
+		exit
+	fi
+
 	pick_args=
 	if test "$1" = PICK-ARGS-FROM-ARGV
 		then
