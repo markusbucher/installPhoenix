@@ -5,15 +5,9 @@
 # usage: installPhoenix.sh --ARGUMENT1 --ARGUMENT2 ...
 # Released under GNU GPL2 or later
 # Author: Markus Bucher, markusbucher@gmx.de
-# Author: Gordon Brueggemann, gb@gb-typo3.de
 
 COMMANDLINE_USER=$(whoami)
-if [ $COMMANDLINE_USER!="root" ]; then
-	echo "You probably want to execute this script as superuser. If you experience errors please execute this script with 'sudo'"
-	echo "e.g. sudo installPhoenix --dbname=phoenix --dbuser=mydbuser --dbpass=keepMeSoSecret"
-fi
 
-##
 # Set the defaults
 
 dbhost=127.0.0.1
@@ -41,7 +35,6 @@ function prepareLogging(){
 	logfile="$mywd/installPhoenix.log"
 	errorlogfile="$mywd/installPhoenixError.log"
 	
-	echo " Script started at $mydate by $COMMANDLINE_USER" >> $logfile
 }
 
 ##
@@ -365,10 +358,16 @@ fi
 }
 
 function returnSuccessMessage(){
+	echo
+	echo
 	echo "Installation of TYPO3 phoenix finished. If you are using xdebug please make sure that
 	   xdebug.max_nesting_level is set to a value like 1000 inside php.ini"
 	echo
 	echo "You may want to set a vhost in your apache configuration:"
+	echo
+	echo "You may have to execute the setpermission script"
+	echo "e.g. ./TYPO3v5/Packages/Framework/TYPO3/FLOW3/Scripts/setfilepermissions.sh"
+	echo
 	echo
 	
 
