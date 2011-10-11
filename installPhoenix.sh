@@ -348,7 +348,7 @@ else
 fi
 if [ ! -n "$nodemo" ]; then
 	echo "Importing PhoenixDemoTypo3Org..."
-	./flow3 typo3:site:import < Packages/Sites.TYPO3/PhoenixDemoTypo3Org/Resources/Private/Content/Sites.xml 1>>$logfile 2>$errorlogfile
+	./flow3 typo3:site:import < Packages/Sites/TYPO3.PhoenixDemoTypo3Org/Resources/Private/Content/Sites.xml 1>>$logfile 2>$errorlogfile
 	if [ $? -gt 0 ]; then
 		returnError 7
 	else
